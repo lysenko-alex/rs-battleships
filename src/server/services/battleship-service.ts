@@ -143,6 +143,11 @@ export class BattleshipService {
 
     const attackBoard = game.boards[playerId].attackBoard;
 
+    const target = this.findTargetNearHits(attackBoard);
+    if (target) {
+      return target;
+    }
+
     let attempts = 0;
     const maxAttempts = 100;
 
@@ -168,5 +173,109 @@ export class BattleshipService {
     }
 
     throw new Error('No available cells to attack');
+  }
+
+  private findTargetNearHits(attackBoard: Map<string, string>): Position | null {
+    const activeHits: Position[] = [];
+    for (const [key, status] of attackBoard.entries()) {
+      if (status === 'shot') {
+        const [x, y] = key.split(',').map(Number);
+        activeHits.push({ x, y });
+      }
+    }
+
+    if (activeHits.length === 0) {
+      return null;
+    }
+
+    if (activeHits.length >= 2) {
+      const sortedHits = [...activeHits].sort((a, b) => {
+        if (a.x !== b.x) return a.x - b.x;
+        return a.y - b.y;
+      });
+
+      const firstHit = sortedHits[0];
+      const secondHit = sortedHits[1];
+
+      if (firstHit.x === secondHit.x) {
+        const minY = Math.min(...sortedHits.map((h) => h.y));
+        const maxY = Math.max(...sortedHits.map((h) => h.y));
+
+        if (minY > 0) {
+          const target = { x: firstHit.x, y: minY - 1 };
+          const key = `${target.x},${target.y}`;
+          if (!attackBoard.has(key)) {
+            return target;
+          }
+        }
+
+        if (maxY < 9) {
+          const target = { x: firstHit.x, y: maxY + 1 };
+          const key = `${target.x},${target.y}`;
+          if (!attackBoard.has(key)) {
+            return target;
+          }
+        }
+      } else if (firstHit.y === secondHit.y) {
+        const minX = Math.min(...sortedHits.map((h) => h.x));
+        const maxX = Math.max(...sortedHits.map((h) => h.x));
+
+        if (minX > 0) {
+          const target = { x: minX - 1, y: firstHit.y };
+          const key = `${target.x},${target.y}`;
+          if (!attackBoard.has(key)) {
+            return target;
+          }
+        }
+
+        if (maxX < 9) {
+          const target = { x: maxX + 1, y: firstHit.y };
+          const key = `${target.x},${target.y}`;
+          if (!attackBoard.has(key)) {
+            return target;
+          }
+        }
+      }
+    }
+
+    const lastHit = activeHits[activeHits.length - 1];
+    const adjacentCells = [
+      { x: lastHit.x - 1, y: lastHit.y }, // left
+      { x: lastHit.x + 1, y: lastHit.y }, // right
+      { x: lastHit.x, y: lastHit.y - 1 }, // up
+      { x: lastHit.x, y: lastHit.y + 1 }, // down
+    ];
+
+    const shuffled = adjacentCells.sort(() => Math.random() - 0.5);
+
+    for (const cell of shuffled) {
+      if (cell.x >= 0 && cell.x <= 9 && cell.y >= 0 && cell.y <= 9) {
+        const key = `${cell.x},${cell.y}`;
+        if (!attackBoard.has(key)) {
+          return cell;
+        }
+      }
+    }
+
+    for (let i = activeHits.length - 2; i >= 0; i--) {
+      const hit = activeHits[i];
+      const cells = [
+        { x: hit.x - 1, y: hit.y },
+        { x: hit.x + 1, y: hit.y },
+        { x: hit.x, y: hit.y - 1 },
+        { x: hit.x, y: hit.y + 1 },
+      ];
+
+      for (const cell of cells) {
+        if (cell.x >= 0 && cell.x <= 9 && cell.y >= 0 && cell.y <= 9) {
+          const key = `${cell.x},${cell.y}`;
+          if (!attackBoard.has(key)) {
+            return cell;
+          }
+        }
+      }
+    }
+
+    return null;
   }
 }
